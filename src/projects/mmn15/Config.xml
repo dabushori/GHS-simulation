@@ -134,7 +134,7 @@
 		<DefaultMessageTransmissionModel value="ConstantTime" />
 
 		<!--Default connectivity model used when none is specified-->
-		<DefaultConnectivityModel value="UDG" />
+		<DefaultConnectivityModel value="StaticConnectivity" />
 
 		<!--Default distribution model used when none is specified-->
 		<DefaultDistributionModel value="Random" />
@@ -143,7 +143,7 @@
 		<DefaultInterferenceModel value="NoInterference" />
 
 		<!--Default mobility model used when none is specified-->
-		<DefaultMobilityModel value="RandomDirection" />
+		<DefaultMobilityModel value="NoMobility" />
 
 		<!--Default reliability model used when none is specified-->
 		<DefaultReliabilityModel value="ReliableDelivery" />
