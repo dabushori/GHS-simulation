@@ -40,13 +40,17 @@ package projects.mmn15;
 import projects.mmn15.nodes.edges.WeightedEdge;
 import projects.mmn15.nodes.nodeImplementations.GHSNode;
 import sinalgo.configuration.Configuration;
+import sinalgo.nodes.edges.Edge;
 import sinalgo.runtime.AbstractCustomGlobal;
 import sinalgo.runtime.Runtime;
 import sinalgo.tools.Tools;
 import sinalgo.tools.Tuple;
 import sinalgo.tools.statistics.UniformDistribution;
 
+import javax.swing.*;
+import javax.tools.Tool;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Vector;
 
 /**
@@ -71,23 +75,19 @@ import java.util.Vector;
  * added to the GUI. 
  */
 public class CustomGlobal extends AbstractCustomGlobal {
-
-	/* (non-Javadoc)
-	 * @see runtime.AbstractCustomGlobal#hasTerminated()
-	 */
-	public boolean hasTerminated() {
-		return false;
-	}
-
 	// A vector of all the nodes
-	Vector<GHSNode> nodes = new Vector<GHSNode>();
+	static Vector<GHSNode> nodes = new Vector<GHSNode>();
 	// A uniform distribution between 0 and 1
 	UniformDistribution dist = new UniformDistribution(0, 1);
 	// The hashmap containing the weights of the edges in the graph
-	static HashMap<Tuple<GHSNode, GHSNode>, Integer> weights = new HashMap<>();
+	static HashMap<Integer, HashMap<Integer, Integer>> weights = new HashMap<>();
 
-	public static Integer getWeight(GHSNode start, GHSNode end) {
-		return weights.get(new Tuple<>(start, end));
+	public static Integer getWeight(int start, int end) {
+		return weights.get(start).get(end);
+	}
+
+	public static int getNumOfNodes() {
+		return nodes.size();
 	}
 
 	/**
@@ -113,18 +113,25 @@ public class CustomGlobal extends AbstractCustomGlobal {
 			node.setPosition(x, y, 0);
 			node.finishInitializationWithDefaultModels(true);
 			nodes.add(node);
+
+			weights.put(node.ID, new HashMap<>());
 		}
 
-		// Choose 7 random nodes to connect to
-		for (GHSNode currNode: nodes) {
+		// Choose 7 random nodes from the available nodes to connect to
+		for (GHSNode currNode : nodes) {
+			Vector<GHSNode> availableNodes = new Vector<>(nodes);
+			availableNodes.remove(currNode);
+			for (Edge e : currNode.outgoingConnections) {
+				availableNodes.remove(e.endNode);
+			}
+
 			for (int i = 0; i < 7; ++i) {
-				GHSNode neighbor = null;
-				while (neighbor == null || currNode == neighbor || currNode.outgoingConnections.contains(currNode, neighbor)) {
-					neighbor = nodes.get((int) (dist.nextSample() * nodes.size()));
-				}
+				if (availableNodes.isEmpty()) break;
+				GHSNode neighbor = availableNodes.get((int) (dist.nextSample() * availableNodes.size()));
+				availableNodes.remove(neighbor);
 				int weight = WeightedEdge.generateRandomWeight();
-				weights.put(new Tuple<>(currNode, neighbor), weight);
-				weights.put(new Tuple<>(neighbor, currNode), weight);
+				weights.get(currNode.ID).put(neighbor.ID, weight);
+				weights.get(neighbor.ID).put(currNode.ID, weight);
 				currNode.addConnectionTo(neighbor);
 			}
 		}
@@ -136,9 +143,92 @@ public class CustomGlobal extends AbstractCustomGlobal {
 	/**
 	 * The function that will be executed when clicking on the 'Build Graph' button.
 	 */
-	@CustomButton(buttonText="Build Graph", toolTipText="Builds a graph")
+	@CustomButton(buttonText = "Build Graph")
 	public void buildGraph() {
-		int numNodes = Integer.parseInt(Tools.showQueryDialog("Number of nodes (n):"));
-		buildGraph(numNodes);
+		try {
+			String input = Tools.showQueryDialog("Number of nodes (n):");
+			if (input == null) return;
+			int numNodes = Integer.parseInt(input);
+			buildGraph(numNodes);
+		} catch (NumberFormatException e) {
+			Tools.showMessageDialog("Please enter a number");
+		}
+	}
+
+	@CustomButton(buttonText = "Start GHS")
+	public void startGHS() {
+		for (GHSNode node : nodes) {
+			node.startGHS();
+		}
+	}
+
+	@CustomButton(buttonText = "Print Fragments")
+	public void printFragments() {
+		Vector<GHSNode> roots = new Vector<>();
+		for (GHSNode node : nodes) {
+			if (node.parent == null) {
+				roots.add(node);
+			}
+		}
+
+		int count = nodes.size();
+		Vector<GHSNode> queue = new Vector<>();
+		for (GHSNode root : roots) {
+			System.out.println("Starting fragment of " + root.ID);
+			queue.add(root);
+			while (!queue.isEmpty()) {
+				GHSNode curr = queue.remove(0);
+				curr.printParent();
+				queue.addAll(curr.children);
+				if (--count == 0) return;
+			}
+		}
+	}
+
+	@CustomButton(buttonText = "Print Weights")
+	public void printWeights() {
+		for (Map.Entry<Integer, HashMap<Integer, Integer>> nodeEntry : weights.entrySet()) {
+			for (Map.Entry<Integer, Integer> weightEntry : nodeEntry.getValue().entrySet()) {
+				System.out.println("w(" + nodeEntry.getKey() +"," + weightEntry.getKey() + ") = " + weightEntry.getValue());
+			}
+		}
+	}
+
+	@CustomButton(buttonText = "Show Current State")
+	public void showCurrentState() {
+		Tools.showMessageDialog("" + nodes.get(0).currentState);
+	}
+
+	@CustomButton(buttonText = "Has Finished?")
+	public void hasFinished() {
+		int count = 0;
+		for (GHSNode node : nodes) {
+			if (node.parent == null) ++count;
+		}
+		if (count > 1) {
+			Tools.showMessageDialog("Not finished");
+		} else if (count < 1) {
+			Tools.showMessageDialog("Something's wrong, I can feel it");
+		} else {
+			Tools.showMessageDialog("Finished");
+		}
+	}
+
+	/* (non-Javadoc)
+	 * @see runtime.AbstractCustomGlobal#hasTerminated()
+	 */
+	public boolean hasTerminated() {
+		int count = 0;
+		for (GHSNode node : nodes) {
+			if (node.parent == null) ++count;
+		}
+		if (count > 1) {
+			return false;
+		} else if (count < 1) {
+			// error
+			return false;
+		} else {
+			return true;
+		}
 	}
 }
