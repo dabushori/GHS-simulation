@@ -201,6 +201,13 @@ public class CustomGlobal extends AbstractCustomGlobal {
 
 	@CustomButton(buttonText = "Has Finished?")
 	public void hasFinished() {
+//		for (GHSNode node : nodes) {
+//			if (!node.hasFinished()) {
+//				return false;
+//			}
+//		}
+//		return true;
+
 		int count = 0;
 		for (GHSNode node : nodes) {
 			if (node.parent == null) ++count;
@@ -218,17 +225,24 @@ public class CustomGlobal extends AbstractCustomGlobal {
 	 * @see runtime.AbstractCustomGlobal#hasTerminated()
 	 */
 	public boolean hasTerminated() {
-		int count = 0;
 		for (GHSNode node : nodes) {
-			if (node.parent == null) ++count;
+			if (!node.hasFinished()) {
+				return false;
+			}
 		}
-		if (count > 1) {
-			return false;
-		} else if (count < 1) {
-			// error
-			return false;
-		} else {
-			return true;
-		}
+		return true;
+
+//		int count = 0;
+//		for (GHSNode node : nodes) {
+//			if (node.parent == null) ++count;
+//		}
+//		if (count > 1) {
+//			return false;
+//		} else if (count < 1) {
+//			// error
+//			return false;
+//		} else {
+//			return true;
+//		}
 	}
 }

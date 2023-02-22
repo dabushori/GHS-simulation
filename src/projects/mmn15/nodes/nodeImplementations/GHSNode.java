@@ -39,6 +39,7 @@ public class GHSNode extends Node {
         int minWeight = WeightedEdge.MAX_WEIGHT + 1; // max value
         GHSNode minimumWeightNeighbor = null;
         for (Edge e: outgoingConnections) {
+
             GHSNode neighbor = (GHSNode) e.endNode;
             if (nodesToFragmentID.get(neighbor) == fragmentID) continue;
             int weight = getWeightOfEdgeTo(neighbor);
@@ -59,6 +60,10 @@ public class GHSNode extends Node {
         MWOE_BROADCASTING,
         NEW_ROOT_BROADCASTING,
         FINISHED,
+    }
+
+    public boolean hasFinished() {
+        return currentState == GHSStates.FINISHED;
     }
 
     int iterationCounter = 0;
@@ -143,6 +148,11 @@ public class GHSNode extends Node {
                         } else {
                             children.add(node);
                         }
+                    } else if (msg instanceof FinishMessage) {
+                        for (GHSNode child : children) {
+                            send(msg, child);
+                        }
+                        currentState = GHSStates.FINISHED;
                     }
                 }
                 // If the parentCandidate didn't choose you (very sad) add the chosen MWOE to the fragment and mark it as a parent
@@ -171,6 +181,11 @@ public class GHSNode extends Node {
                         Message msg = inbox.next();
                         if (msg instanceof FragmentIDMessage) {
                             nodesToFragmentID.put((GHSNode) inbox.getSender(), ((FragmentIDMessage) msg).getId());
+                        } else if (msg instanceof FinishMessage) {
+                            for (GHSNode child : children) {
+                                send(msg, child);
+                            }
+                            currentState = GHSStates.FINISHED;
                         }
                     }
                     // If the current node is not the root of the fragment, update the fragment id according to the received id and pass it to the node's children
@@ -189,6 +204,11 @@ public class GHSNode extends Node {
                             // Listen for updates of the neighbors about their fragment ids
                         } else if (msg instanceof FragmentIDMessage) {
                             nodesToFragmentID.put((GHSNode) inbox.getSender(), ((FragmentIDMessage) msg).getId());
+                        } else if (msg instanceof FinishMessage) {
+                            for (GHSNode child : children) {
+                                send(msg, child);
+                            }
+                            currentState = GHSStates.FINISHED;
                         }
                     }
                 }
@@ -199,21 +219,29 @@ public class GHSNode extends Node {
                         mwoeNode = getMinimumWeightEdge();
                         // If mwoeNode == null, getWeightOfEdgeTo(mwoeNode) == null and it is fine
                         // We must do it because the parent must receive one message from every child
-                        send(new MWOESuggestionMessage(this, mwoeNode, getWeightOfEdgeTo(mwoeNode)), parent);
+                        send(new MWOESuggestionMessage(this, mwoeNode, getWeightOfEdgeTo(mwoeNode), 1), parent);
                     }
                 } else {
                     while (inbox.hasNext()) {
                         Message msg = inbox.next();
                         if (msg instanceof MWOESuggestionMessage) {
                             mwoeQueue.add((MWOESuggestionMessage) msg);
+                        } else if (msg instanceof FinishMessage) {
+                            for (GHSNode child : children) {
+                                send(msg, child);
+                            }
+                            currentState = GHSStates.FINISHED;
                         }
                     }
                     if (mwoeQueue.size() == children.size()) {
                         mwoeNode = getMinimumWeightEdge();
                         Integer min_weight = getWeightOfEdgeTo(mwoeNode);
                         MWOESuggestionMessage mwoeSuggestionToSend = new MWOESuggestionMessage(this, mwoeNode, min_weight);
+                        // Initialized to 1 to include the current node in the count
+                        int nodesInSubtreeCounter = 1;
                         if (min_weight == null) min_weight = WeightedEdge.MAX_WEIGHT;
                         for (MWOESuggestionMessage mwoeMsg : mwoeQueue) {
+                            nodesInSubtreeCounter += mwoeMsg.getNumOfNodesInSubtree();
                             Integer currWeight = mwoeMsg.getWeight();
                             if (currWeight == null) continue;
                             if (currWeight < min_weight) {
@@ -221,7 +249,15 @@ public class GHSNode extends Node {
                                 mwoeSuggestionToSend = mwoeMsg;
                             }
                         }
+                        mwoeSuggestionToSend.setNumOfNodesInSubtree(nodesInSubtreeCounter);
                         if (isRoot) {
+                            // If all the nodes are in the subtree of the current root, the algorithm is finished
+                            if (nodesInSubtreeCounter == CustomGlobal.getNumOfNodes()) {
+                                for (GHSNode child : children) {
+                                    send(new FinishMessage(), child);
+                                }
+                                currentState = GHSStates.FINISHED;
+                            }
                             mwoeToAdd = mwoeSuggestionToSend;
                         } else {
                             send(mwoeSuggestionToSend, parent);
@@ -261,6 +297,11 @@ public class GHSNode extends Node {
                                     send(chosenMWOEMsg, child);
                                 }
                             }
+                        } else if (msg instanceof FinishMessage) {
+                            for (GHSNode child : children) {
+                                send(msg, child);
+                            }
+                            currentState = GHSStates.FINISHED;
                         }
                     }
                 }
@@ -285,6 +326,11 @@ public class GHSNode extends Node {
                         }
                         parent = (GHSNode) inbox.getSender();
                         children.remove(parent);
+                    } else if (msg instanceof FinishMessage) {
+                        for (GHSNode child : children) {
+                            send(msg, child);
+                        }
+                        currentState = GHSStates.FINISHED;
                     }
                 }
                 break;

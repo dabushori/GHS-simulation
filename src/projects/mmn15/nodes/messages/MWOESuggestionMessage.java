@@ -8,6 +8,8 @@ public class MWOESuggestionMessage extends Message {
     GHSNode to;
     Integer weight;
 
+    int numOfNodesInSubtree;
+
     public GHSNode getFrom() {
         return from;
     }
@@ -20,14 +22,25 @@ public class MWOESuggestionMessage extends Message {
         return weight;
     }
 
+    public int getNumOfNodesInSubtree() { return numOfNodesInSubtree; }
+    public void setNumOfNodesInSubtree(int numOfNodesInSubtree) { this.numOfNodesInSubtree = numOfNodesInSubtree; }
+
+    public MWOESuggestionMessage(GHSNode from, GHSNode to, Integer weight, int numOfNodesInSubtree) {
+        this.from = from;
+        this.to = to;
+        this.weight = weight;
+        this.numOfNodesInSubtree = numOfNodesInSubtree;
+    }
+
     public MWOESuggestionMessage(GHSNode from, GHSNode to, Integer weight) {
         this.from = from;
         this.to = to;
         this.weight = weight;
+        this.numOfNodesInSubtree = 0;
     }
 
     @Override
     public Message clone() {
-        return new MWOESuggestionMessage(from, to, weight);
+        return new MWOESuggestionMessage(from, to, weight, numOfNodesInSubtree);
     }
 }
