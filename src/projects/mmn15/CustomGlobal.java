@@ -40,13 +40,23 @@ package projects.mmn15;
 import projects.mmn15.nodes.edges.WeightedEdge;
 import projects.mmn15.nodes.nodeImplementations.GHSNode;
 import sinalgo.configuration.Configuration;
+import sinalgo.gui.controlPanel.ControlPanel;
 import sinalgo.nodes.edges.Edge;
 import sinalgo.runtime.AbstractCustomGlobal;
+import sinalgo.runtime.Global;
 import sinalgo.runtime.Runtime;
+import sinalgo.runtime.SynchronousRuntimeThread;
 import sinalgo.tools.Tools;
 import sinalgo.tools.statistics.UniformDistribution;
 
+import javax.naming.ldap.Control;
+import java.awt.event.ActionEvent;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Vector;
 
@@ -301,4 +311,46 @@ public class CustomGlobal extends AbstractCustomGlobal {
         if (sum == null) Tools.showMessageDialog("MST wasn't found yet.");
         else Tools.showMessageDialog("The sum of the weights of all the edges is " + sum);
     }
+
+    FileWriter resultsFile;
+    int currIdx = 0;
+    int[] numberOfNodes = {200, 291, 382, 473, 564, 655, 746, 837, 928, 1019, 1110, 1201, 1292, 1383, 1474, 1565, 1656, 1747, 1838, 1929, 2000};
+
+    @CustomButton(buttonText = "RUN", toolTipText = "Run")
+    public void runSimulation() {
+        try {
+            if (currIdx >= numberOfNodes.length) return;
+            if (nodes.isEmpty()) {
+                resultsFile = new FileWriter(Paths.get(System.getProperty("user.dir"), "results.csv").toString());
+                resultsFile.write("Number of nodes,Sum of weights,Sum of weights in MST\n");
+            } else {
+                resultsFile.write(String.format("{},{},{}\n", getNumOfNodes(), calculateSumOfWeights(), calculateSumOfWeightsInMST()));
+            }
+
+            buildGraph(numberOfNodes[currIdx++]);
+
+            SynchronousRuntimeThread gRT = new SynchronousRuntimeThread(Tools.getGuiRuntime());
+            gRT.numberOfRounds = Long.MAX_VALUE;
+            gRT.refreshRate = Configuration.refreshRate;
+            Global.isRunning = true;
+            gRT.start();
+
+        } catch (IOException e) {
+            System.out.println("Failed writing results.");
+        }
+    }
+
+    @Override
+    public void onExit() {
+        super.onExit();
+        try {
+            if (resultsFile != null) {
+                resultsFile.write(String.format("{},{},{}\n", getNumOfNodes(), calculateSumOfWeights(), calculateSumOfWeightsInMST()));
+                resultsFile.close();
+            }
+        } catch (IOException e) {
+            System.out.println("Error closing the results file.");
+        }
+    }
+
 }
