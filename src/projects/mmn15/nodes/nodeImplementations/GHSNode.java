@@ -137,7 +137,8 @@ public class GHSNode extends Node {
         MWOE_BROADCASTING, // broadcast the MWOE of the fragment which will be added to the MST
         NEW_ROOT_BROADCASTING, // broadcast the new root of the fragment and flip the edges on the route from it to the old root of the fragment
         SERVER_REROUTING, // redirect the edges to make the server the root of the MST
-        FINISHED, // The algorithm has finished
+        FINISHED, // the algorithm has finished
+        SENDING_MESSAGE_TO_SERVER, // sending a message to the server over the MST
     }
 
     /**
@@ -147,6 +148,15 @@ public class GHSNode extends Node {
      */
     public boolean hasFinished() {
         return currentState == GHSStates.FINISHED;
+    }
+
+    /**
+     * Return whether the algorithm has found the MST, which is exactly if the state is FINISHED or the current node is sending a message to the server.
+     *
+     * @return true if the MST was found, false otherwise
+     */
+    public boolean hasFoundMST() {
+        return currentState == GHSStates.FINISHED || currentState == GHSStates.SENDING_MESSAGE_TO_SERVER;
     }
 
     // A round counter to insure each phase (which needs to) takes n rounds

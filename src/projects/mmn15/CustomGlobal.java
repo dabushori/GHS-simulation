@@ -244,4 +244,18 @@ public class CustomGlobal extends AbstractCustomGlobal {
         }
         return true;
     }
+
+    /**
+     * Return whether the MST was found.
+     *
+     * @return false when there's a node that doesn't know that the MST was found, true otherwise
+     */
+    public static boolean hasFoundMST() {
+        for (GHSNode node : nodes) {
+            if (!node.hasFoundMST()) {
+                return false;
+            }
+        }
+        return true;
+    }
 }

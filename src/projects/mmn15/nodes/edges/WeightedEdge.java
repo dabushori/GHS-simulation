@@ -65,10 +65,24 @@ public class WeightedEdge extends BidirectionalEdge {
     @Override
     public Color getColor() {
         GHSNode start = (GHSNode) startNode, end = (GHSNode) endNode;
-        // If the edge is in the MST, which is determined by whether one of the nodes is the parent of the other
-        if ((start.getParent() != null && start.getParent().equals(end)) || (end.getParent() != null && end.getParent().equals(start))) {
-            return Color.green;
+
+        if (CustomGlobal.hasFoundMST()) {
+            // If there is a going on message on this edge, mark it red
+            if (numberOfMessagesOnThisEdge > 0 || oppositeEdge.numberOfMessagesOnThisEdge > 0) {
+                return Color.RED;
+            }
+            // If the edge is in the MST and doesn't have a message on it, mark it green
+            // This is determined by whether one of the nodes is the parent of the other
+            if ((start.getParent() != null && start.getParent().equals(end)) || (end.getParent() != null && end.getParent().equals(start))) {
+                return Color.green;
+            }
+
+            return Color.BLACK;
         }
-        return super.getColor();
+
+        if (numberOfMessagesOnThisEdge > 0 || oppositeEdge.numberOfMessagesOnThisEdge > 0) {
+            return Color.RED;
+        }
+        return Color.BLACK;
     }
 }
