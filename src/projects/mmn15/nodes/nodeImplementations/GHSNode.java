@@ -607,11 +607,11 @@ public class GHSNode extends Node {
                 ServerRequestMessage req = (ServerRequestMessage) msg;
                 if (isServer) {
                     Vector<GHSNode> route = req.getRoute();
-                    GHSNode prevInRoute = req.getRoute().lastElement();
+                    GHSNode prevInRoute = route.lastElement();
                     // Send the response generated from this request to the previous node in the route
                     send(new ServerResponseMessage(req), prevInRoute);
                 } else {
-                    // Send the request to the parent so it will reach the server. The used constructor of ServerRequestMessage will add `this` to the route of req
+                    // Send the request to the parent, so it will reach the server. The used constructor of ServerRequestMessage will add `this` to the route of req
                     send(new ServerRequestMessage(req, this), parent);
                 }
             }
@@ -700,33 +700,10 @@ public class GHSNode extends Node {
     /* End of Sinalgo hooks */
 
     /* Sinalgo menu buttons */
-
-    /**
-     * Print all the neighbors of the current node.
-     */
-    @NodePopupMethod(menuText = "Print Neighbors")
-    public void printNeighbors() {
-        System.out.println("Neighbors of " + ID + ":");
-        for (Edge e : outgoingConnections) {
-            System.out.println("Edge from " + e.startNode.ID + " to " + e.endNode.ID);
-        }
-    }
-
-    /**
-     * Print all the children of the current node.
-     */
-    @NodePopupMethod(menuText = "Print Children")
-    public void printChildren() {
-        System.out.println("Children of " + ID + ":");
-        for (GHSNode child : children) {
-            System.out.println(child.ID);
-        }
-    }
-
+    
     /**
      * Print the parent of the current node.
      */
-    @NodePopupMethod(menuText = "Print Parent")
     public void printParent() {
         if (parent == null) {
             System.out.println("Node " + ID + " doesn't have a parent (it is the root).");
