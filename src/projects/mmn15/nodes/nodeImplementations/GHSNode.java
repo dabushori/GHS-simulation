@@ -118,7 +118,7 @@ public class GHSNode extends Node {
 
     @Override
     public void handleMessages(Inbox inbox) {
-        if (!initialized) {
+        if (currentState == GHSStates.NOT_STARTED) {
             startGHS();
         }
         GHSNode mwoeNode;
@@ -362,7 +362,6 @@ public class GHSNode extends Node {
     public void checkRequirements() throws WrongConfigurationException {
     }
 
-    public boolean initialized = false;
     public void startGHS() {
         // Reset all the records
         nodesToFragmentID.clear();
@@ -388,8 +387,6 @@ public class GHSNode extends Node {
 
         parentCandidate = getMinimumWeightEdge();
         currentState = GHSStates.MWOE_SEND;
-
-        initialized = true;
     }
 
     @NodePopupMethod(menuText = "Print Neighbors")
