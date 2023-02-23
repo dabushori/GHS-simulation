@@ -39,7 +39,12 @@ package projects.mmn15;
 
 import projects.mmn15.nodes.edges.WeightedEdge;
 import projects.mmn15.nodes.nodeImplementations.GHSNode;
+import projects.sample5.nodes.messages.PayloadMsg;
+import projects.sample5.nodes.nodeImplementations.FNode;
+import projects.sample5.nodes.timers.PayloadMessageTimer;
 import sinalgo.configuration.Configuration;
+import sinalgo.gui.helper.NodeSelectionHandler;
+import sinalgo.nodes.Node;
 import sinalgo.nodes.edges.Edge;
 import sinalgo.runtime.AbstractCustomGlobal;
 import sinalgo.runtime.Runtime;
@@ -175,6 +180,13 @@ public class CustomGlobal extends AbstractCustomGlobal {
             if (input == null) return;
             int numNodes = Integer.parseInt(input);
             buildGraph(numNodes);
+            Tools.getNodeSelectedByUser(n -> {
+                if (n == null || !(n instanceof GHSNode)) {
+                    return; // aborted
+                }
+                GHSNode node = (GHSNode) n;
+                node.setIsServer(true);
+            }, "Select a node to be the server...");
         } catch (NumberFormatException e) {
             Tools.showMessageDialog("Please enter a valid number");
         }

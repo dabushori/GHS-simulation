@@ -8,6 +8,7 @@ import sinalgo.nodes.Node;
 import sinalgo.nodes.edges.Edge;
 import sinalgo.nodes.messages.Inbox;
 import sinalgo.nodes.messages.Message;
+import sinalgo.tools.Tools;
 
 import java.util.HashMap;
 import java.util.Vector;
@@ -52,6 +53,15 @@ public class GHSNode extends Node {
      */
     public GHSNode getParent() {
         return parent;
+    }
+
+    /**
+     * Change the value of the isServer variable, which indicates whether the current node is the server or not.
+     *
+     * @param isServer the new value of isServer
+     */
+    public void setIsServer(boolean isServer) {
+        this.isServer = isServer;
     }
 
     /**
@@ -100,7 +110,6 @@ public class GHSNode extends Node {
 
         // Initialize iteration and round counters
         roundCounter = 0;
-        iterationCounter = 0;
 
         // Each node is its fragment root in the first iteration, so each node will connect its fragment to another fragment using the MWOE he finds
         isRoot = true;
@@ -127,6 +136,7 @@ public class GHSNode extends Node {
         MWOE_SEARCHING, // convergecast the MWOE to the root of the fragment
         MWOE_BROADCASTING, // broadcast the MWOE of the fragment which will be added to the MST
         NEW_ROOT_BROADCASTING, // broadcast the new root of the fragment and flip the edges on the route from it to the old root of the fragment
+        SERVER_REROUTING, // redirect the edges to make the server the root of the MST
         FINISHED, // The algorithm has finished
     }
 
@@ -139,8 +149,6 @@ public class GHSNode extends Node {
         return currentState == GHSStates.FINISHED;
     }
 
-    // An iteration counter to insure the nodes are finished after log2(n) iterations
-    int iterationCounter = 0;
     // A round counter to insure each phase (which needs to) takes n rounds
     int roundCounter = 0;
     // The current state of the algorithm at the current node
@@ -156,8 +164,9 @@ public class GHSNode extends Node {
      * - MWOE_SEARCHING
      * - MWOE_BROADCASTING
      * - NEW_ROOT_BROADCASTING
-     * The lists are sorted by their order, and after the NEW_ROOT_BROADCASTING state theres a check - if the iteration counter reaches log2(n), it switches the state to FINISHED.
-     * Otherwise, it switches the state back to MWOE_SEND.
+     * The lists are sorted by the order of the states.
+     * Once the root notices that all the nodes in the network are in his fragment, the server rerouting starts.
+     * The server rerouting takes 2n rounds from the moment the root noticed that all the nodes are in his fragments.
      */
     public void switchState() {
         switch (currentState) {
@@ -191,20 +200,24 @@ public class GHSNode extends Node {
                 break;
             case NEW_ROOT_BROADCASTING:
                 if (++roundCounter == CustomGlobal.getNumOfNodes()) {
-                    // Stupid java doesn't have a Math.log2 function
-                    if (++iterationCounter == Math.ceil(Math.log(CustomGlobal.getNumOfNodes()) / Math.log(2))) {
-                        iterationCounter = 0;
-                        roundCounter = 0;
-                        currentState = GHSStates.FINISHED;
-                    } else {
-                        roundCounter = 0;
-                        currentState = GHSStates.MWOE_SEND;
-                    }
+                    roundCounter = 0;
+                    currentState = GHSStates.MWOE_SEND;
+                }
+                break;
+            case SERVER_REROUTING:
+                if (++roundCounter == 2 * CustomGlobal.getNumOfNodes()) {
+                    currentState = GHSStates.FINISHED;
+                    roundCounter = 0;
                 }
                 break;
             case FINISHED:
                 break;
         }
+    }
+
+    public void startServerRerouting(StartServerReroutingMessage msg) {
+        currentState = GHSStates.SERVER_REROUTING;
+        roundCounter = ((int) Tools.getGlobalTime()) - msg.getStartTime();
     }
 
     /**
@@ -252,12 +265,12 @@ public class GHSNode extends Node {
                     children.add(node);
                 }
             }
-            // Listen for a finish message
-            else if (msg instanceof FinishMessage) {
+            // Listen for a start server rerouting message
+            else if (msg instanceof StartServerReroutingMessage) {
                 for (GHSNode child : children) {
                     send(msg, child);
                 }
-                currentState = GHSStates.FINISHED;
+                startServerRerouting((StartServerReroutingMessage) msg);
             }
         }
         // If the parentCandidate didn't choose you (very sad) add the chosen MWOE to the fragment and mark it as a parent
@@ -295,12 +308,12 @@ public class GHSNode extends Node {
                 if (msg instanceof FragmentIDMessage) {
                     nodesToFragmentID.put((GHSNode) inbox.getSender(), ((FragmentIDMessage) msg).getId());
                 }
-                // Listen for a finish message
-                else if (msg instanceof FinishMessage) {
+                // Listen for a start server rerouting message
+                else if (msg instanceof StartServerReroutingMessage) {
                     for (GHSNode child : children) {
                         send(msg, child);
                     }
-                    currentState = GHSStates.FINISHED;
+                    startServerRerouting((StartServerReroutingMessage) msg);
                 }
             }
         }
@@ -322,12 +335,12 @@ public class GHSNode extends Node {
                 else if (msg instanceof FragmentIDMessage) {
                     nodesToFragmentID.put((GHSNode) inbox.getSender(), ((FragmentIDMessage) msg).getId());
                 }
-                // Listen for a finish message
-                else if (msg instanceof FinishMessage) {
+                // Listen for a start server rerouting message
+                else if (msg instanceof StartServerReroutingMessage) {
                     for (GHSNode child : children) {
                         send(msg, child);
                     }
-                    currentState = GHSStates.FINISHED;
+                    startServerRerouting((StartServerReroutingMessage) msg);
                 }
             }
         }
@@ -338,7 +351,7 @@ public class GHSNode extends Node {
      * In this state, each node convergecasts the MWOE which connects the node to a node from another fragment.
      * Each node waits for the MWOE suggestions from all of its children to be received, and then chooses the minimal from those and from its MWOE and forwards it to its parent.
      * In addition, each node sends the number of nodes in the subtree which it is the root of. Each node sums the values of its children and adds 1, and this is the value it forwards its parent.
-     * The root of every fragment will eventually get the number of nodes in its fragment, and if it is n the algorithm will be finished by broadcasting finish messages.
+     * The root of every fragment will eventually get the number of nodes in its fragment, and if it is n the algorithm will be finished by broadcasting start server rerouting messages.
      *
      * @param inbox The inbox of the node
      */
@@ -350,18 +363,24 @@ public class GHSNode extends Node {
                 // We must do it because the parent must receive one message from every child
                 send(new MWOESuggestionMessage(this, mwoeNode, getWeightOfEdgeTo(mwoeNode), 1), parent);
             }
+            while (inbox.hasNext()) {
+                Message msg = inbox.next();
+                if (msg instanceof StartServerReroutingMessage) {
+                    startServerRerouting((StartServerReroutingMessage) msg);
+                }
+            }
         } else {
             while (inbox.hasNext()) {
                 Message msg = inbox.next();
                 if (msg instanceof MWOESuggestionMessage) {
                     mwoeQueue.add((MWOESuggestionMessage) msg);
                 }
-                // Listen for a finish message
-                else if (msg instanceof FinishMessage) {
+                // Listen for a start server rerouting message
+                else if (msg instanceof StartServerReroutingMessage) {
                     for (GHSNode child : children) {
                         send(msg, child);
                     }
-                    currentState = GHSStates.FINISHED;
+                    startServerRerouting((StartServerReroutingMessage) msg);
                 }
             }
             if (mwoeQueue.size() == children.size()) {
@@ -384,10 +403,11 @@ public class GHSNode extends Node {
                 if (isRoot) {
                     // If all the nodes are in the subtree of the current root, the algorithm is finished
                     if (nodesInSubtreeCounter == CustomGlobal.getNumOfNodes()) {
+                        StartServerReroutingMessage msg = new StartServerReroutingMessage((int) Tools.getGlobalTime());
                         for (GHSNode child : children) {
-                            send(new FinishMessage(), child);
+                            send(msg, child);
                         }
-                        currentState = GHSStates.FINISHED;
+                        startServerRerouting(msg);
                     }
                     mwoeToAdd = mwoeSuggestionToSend;
                 } else {
@@ -441,12 +461,12 @@ public class GHSNode extends Node {
                         }
                     }
                 }
-                // Listen for a finish message
-                else if (msg instanceof FinishMessage) {
+                // Listen for a start server rerouting message
+                else if (msg instanceof StartServerReroutingMessage) {
                     for (GHSNode child : children) {
                         send(msg, child);
                     }
-                    currentState = GHSStates.FINISHED;
+                    startServerRerouting((StartServerReroutingMessage) msg);
                 }
             }
         }
@@ -465,7 +485,42 @@ public class GHSNode extends Node {
             if (!isRoot) {
                 children.add(parent);
                 send(new FlipEdgeDirectionMessage(), parent);
+                parent = null;
+                isRoot = true;
             }
+        }
+        while (inbox.hasNext()) {
+            Message msg = inbox.next();
+            if (msg instanceof FlipEdgeDirectionMessage) {
+                if (!isRoot) {
+                    children.add(parent);
+                    send(msg, parent);
+                } else {
+                    isRoot = false;
+                }
+                parent = (GHSNode) inbox.getSender();
+                children.remove(parent);
+            }
+            // Listen for a start server rerouting message
+            else if (msg instanceof StartServerReroutingMessage) {
+                for (GHSNode child : children) {
+                    send(msg, child);
+                }
+                startServerRerouting((StartServerReroutingMessage) msg);
+            }
+        }
+    }
+
+    /**
+     * An iteration of the SERVER_REROUTING state.
+     * In this state, the edges on the route from the root to the server will be flipped in order to make the server the new root of the MST.
+     *
+     * @param inbox The inbox of the node
+     */
+    public void serverReroutingIter(Inbox inbox) {
+        if (isServer && !isRoot) {
+            children.add(parent);
+            send(new FlipEdgeDirectionMessage(), parent);
             parent = null;
             isRoot = true;
         }
@@ -481,12 +536,12 @@ public class GHSNode extends Node {
                 parent = (GHSNode) inbox.getSender();
                 children.remove(parent);
             }
-            // Listen for a finish message
-            else if (msg instanceof FinishMessage) {
+            // Listen for a start server rerouting message
+            else if (msg instanceof StartServerReroutingMessage) {
                 for (GHSNode child : children) {
                     send(msg, child);
                 }
-                currentState = GHSStates.FINISHED;
+                startServerRerouting((StartServerReroutingMessage) msg);
             }
         }
     }
@@ -522,6 +577,9 @@ public class GHSNode extends Node {
                 break;
             case NEW_ROOT_BROADCASTING:
                 newRootBroadcastingIter(inbox);
+                break;
+            case SERVER_REROUTING:
+                serverReroutingIter(inbox);
                 break;
         }
         switchState();
