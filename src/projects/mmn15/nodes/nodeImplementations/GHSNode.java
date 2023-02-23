@@ -35,7 +35,9 @@ public class GHSNode extends Node {
     public GHSNode parentCandidate;
     // A variable that indicates whether the current node is the root of its fragment
     boolean isRoot;
+    // A variable that indicates wether the current node is the server
     boolean isServer;
+    Vector<ServerRequestMessage> pendingReqs = new Vector<>();
 
     /**
      * Get the children vector of the node.
@@ -225,9 +227,35 @@ public class GHSNode extends Node {
         }
     }
 
+    /**
+     * A function to initiate the server rerouting process.
+     *
+     * @param msg The received message to start the rerouting
+     */
     public void startServerRerouting(StartServerReroutingMessage msg) {
         currentState = GHSStates.SERVER_REROUTING;
         roundCounter = ((int) Tools.getGlobalTime()) - msg.getStartTime();
+    }
+
+    /**
+     * Start the message sending process.
+     *
+     * @param message The message that will be sent.
+     */
+    public void startMessageSending(String message) {
+        currentState = GHSStates.SENDING_MESSAGE_TO_SERVER;
+        System.out.println("Sending [" + message + "] to the server");
+
+        if (isServer) {
+            endMessageSending(ServerResponseMessage.generateServerResponse(message));
+            return;
+        }
+        pendingReqs.add(new ServerRequestMessage(message, this));
+    }
+
+    public void endMessageSending(String response) {
+        currentState = GHSStates.FINISHED;
+        System.out.println("Server responded with:\n\t" + response);
     }
 
     /**
@@ -556,6 +584,56 @@ public class GHSNode extends Node {
         }
     }
 
+    /**
+     * An iteration of the SENDING_MESSAGE_TO_SERVER state. This method will also be used in the FINISHED state.
+     * This is because nodes which didn't sent a request to the server and aren't in the SENDING_MESSAGE_TO_SERVER state need to pass the requests and responses of other nodes in the SENDING_MESSAGE_TO_SERVER state.
+     * In this function, the nodes will pass requests to their parent, will pass responses to one of their children using the route that is given in the message.
+     * The server will receive requests and create responses to send.
+     *
+     * @param inbox The inbox of the node
+     */
+    public void sendingMessageToServerIter(Inbox inbox) {
+        // If there is a request to initiate, send it to the parent of the current node
+        if (!pendingReqs.isEmpty()) {
+            for (ServerRequestMessage req : pendingReqs) {
+                send(req, parent);
+            }
+            pendingReqs.clear();
+        }
+        while (inbox.hasNext()) {
+            Message msg = inbox.next();
+            // Pass requests or handle them, depending on whether this node is the server or not
+            if (msg instanceof ServerRequestMessage) {
+                ServerRequestMessage req = (ServerRequestMessage) msg;
+                if (isServer) {
+                    Vector<GHSNode> route = req.getRoute();
+                    GHSNode prevInRoute = req.getRoute().lastElement();
+                    // Send the response generated from this request to the previous node in the route
+                    send(new ServerResponseMessage(req), prevInRoute);
+                } else {
+                    // Send the request to the parent so it will reach the server. The used constructor of ServerRequestMessage will add `this` to the route of req
+                    send(new ServerRequestMessage(req, this), parent);
+                }
+            }
+            // Pass responses or handle them, depending on whether this node is the origin of the request or not
+            else if (msg instanceof ServerResponseMessage) {
+                ServerResponseMessage resp = (ServerResponseMessage) msg;
+                Vector<GHSNode> route = resp.getRoute();
+                // If it is the current node's response handle it
+                if (route.size() == 1 && route.get(0).equals(this)) {
+                    endMessageSending(resp.getMessage());
+                }
+                // Remove this from the route and pass the response to the previous node in the route
+                else {
+                    GHSNode thisInRoute = route.lastElement();
+                    route.remove(thisInRoute);
+                    GHSNode prevInRoute = route.lastElement();
+                    send(new ServerResponseMessage(resp.getMessage(), route), prevInRoute);
+                }
+            }
+        }
+    }
+
     /* Sinalgo hooks */
 
     /**
@@ -590,6 +668,10 @@ public class GHSNode extends Node {
                 break;
             case SERVER_REROUTING:
                 serverReroutingIter(inbox);
+                break;
+            case SENDING_MESSAGE_TO_SERVER:
+            case FINISHED:
+                sendingMessageToServerIter(inbox);
                 break;
         }
         switchState();
@@ -651,6 +733,15 @@ public class GHSNode extends Node {
         } else {
             System.out.println("Parent of " + ID + " is " + parent.ID);
         }
+    }
+
+    /**
+     * Asks the user for an input and sends it to the server on the MST
+     */
+    @NodePopupMethod(menuText = "Send a message to the server")
+    public void sendMessageToServer() {
+        String input = Tools.showQueryDialog("Enter the message content:");
+        startMessageSending(input);
     }
 
     /* End of Sinalgo menu buttons */
