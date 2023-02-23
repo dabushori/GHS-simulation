@@ -44,18 +44,14 @@ import sinalgo.nodes.edges.Edge;
 import sinalgo.runtime.AbstractCustomGlobal;
 import sinalgo.runtime.Runtime;
 import sinalgo.tools.Tools;
-import sinalgo.tools.Tuple;
 import sinalgo.tools.statistics.UniformDistribution;
 
-import javax.swing.*;
-import javax.tools.Tool;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Vector;
 
 /**
- * This class holds customized global state and methods for the framework. 
- * The only mandatory method to overwrite is 
+ * This class holds customized global state and methods for the framework.
+ * The only mandatory method to overwrite is
  * <code>hasTerminated</code>
  * <br>
  * Optional methods to override are
@@ -68,181 +64,172 @@ import java.util.Vector;
  * <li><code>postRound</code></li>
  * <li><code>checkProjectRequirements</code></li>
  * </ul>
+ *
  * @see AbstractCustomGlobal for more details.
  * <br>
  * In addition, this class also provides the possibility to extend the framework with
  * custom methods that can be called either through the menu or via a button that is
- * added to the GUI. 
+ * added to the GUI.
  */
 public class CustomGlobal extends AbstractCustomGlobal {
-	// A vector of all the nodes
-	static Vector<GHSNode> nodes = new Vector<GHSNode>();
-	// A uniform distribution between 0 and 1
-	UniformDistribution dist = new UniformDistribution(0, 1);
-	// The hashmap containing the weights of the edges in the graph
-	static HashMap<Integer, HashMap<Integer, Integer>> weights = new HashMap<>();
+    // A vector of all the nodes
+    static Vector<GHSNode> nodes = new Vector<GHSNode>();
+    // A uniform distribution between 0 and 1
+    UniformDistribution dist = new UniformDistribution(0, 1);
+    // The hashmap containing the weights of the edges in the graph
+    static HashMap<Integer, HashMap<Integer, Integer>> weights = new HashMap<>();
 
-	public static Integer getWeight(int start, int end) {
-		return weights.get(start).get(end);
-	}
+    /**
+     * Get the weight of an edge in the current graph
+     *
+     * @param start the start node of the edge
+     * @param end   the end node of the edge
+     * @return the weight of the edge from start to end
+     */
+    public static Integer getWeight(int start, int end) {
+        return weights.get(start).get(end);
+    }
 
-	public static int getNumOfNodes() {
-		return nodes.size();
-	}
+    /**
+     * Get the number of nodes in the current graph (i.e. n)
+     *
+     * @return The number of nodes in the current graph
+     */
+    public static int getNumOfNodes() {
+        return nodes.size();
+    }
 
-	/**
-	 * Build an undirected weighted graph. Each node chooses 7 other nodes and adds a weighted edge to between it and them.
-	 * @param numNodes The number of nodes in the graph.
-	 */
-	public void buildGraph(int numNodes) {
-		if(numNodes <= 0) {
-			Tools.showMessageDialog("The number of nodes needs to be at least 1.\nCreation of graph aborted.");
-			return;
-		}
+    /**
+     * Build an undirected weighted graph. Each node chooses 7 other nodes and adds a weighted edge to between it and them.
+     *
+     * @param numNodes The number of nodes in the graph.
+     */
+    public void buildGraph(int numNodes) {
+        if (numNodes <= 0) {
+            Tools.showMessageDialog("The number of nodes needs to be at least 1.\nCreation of graph aborted.");
+            return;
+        }
 
-		// Clear all nodes (if any)
-		Runtime.clearAllNodes();
-		weights.clear();
-		nodes.clear();
+        // Clear all nodes (if any)
+        Runtime.clearAllNodes();
+        weights.clear();
+        nodes.clear();
 
-		// Create the nodes in a random position uniformly selected from [0, dimX] x [0, dimY]
-		for(int i = 0; i < numNodes; ++i) {
-			GHSNode node = new GHSNode();
-			double x = dist.nextSample() * Configuration.dimX;
-			double y = dist.nextSample() * Configuration.dimY;
-			node.setPosition(x, y, 0);
-			node.finishInitializationWithDefaultModels(true);
-			nodes.add(node);
+        // Create the nodes in a random position uniformly selected from [0, dimX] x [0, dimY]
+        for (int i = 0; i < numNodes; ++i) {
+            GHSNode node = new GHSNode();
 
-			weights.put(node.ID, new HashMap<>());
-		}
+            // Initialize the node to a random location in the screen
+            double x = dist.nextSample() * Configuration.dimX;
+            double y = dist.nextSample() * Configuration.dimY;
+            node.setPosition(x, y, 0);
 
-		// Choose 7 random nodes from the available nodes to connect to
-		for (GHSNode currNode : nodes) {
-			Vector<GHSNode> availableNodes = new Vector<>(nodes);
-			availableNodes.remove(currNode);
-			for (Edge e : currNode.outgoingConnections) {
-				availableNodes.remove(e.endNode);
-			}
+            // Finalized the initialization (Sinalgo stuff)
+            node.finishInitializationWithDefaultModels(true);
 
-			for (int i = 0; i < 7; ++i) {
-				if (availableNodes.isEmpty()) break;
-				GHSNode neighbor = availableNodes.get((int) (dist.nextSample() * availableNodes.size()));
-				availableNodes.remove(neighbor);
-				int weight = WeightedEdge.generateRandomWeight();
-				weights.get(currNode.ID).put(neighbor.ID, weight);
-				weights.get(neighbor.ID).put(currNode.ID, weight);
-				currNode.addConnectionTo(neighbor);
-			}
-		}
+            // Add the node to the nodes vector
+            nodes.add(node);
 
-		// Repaint the GUI as we have added some nodes
-		Tools.repaintGUI();
-	}
+            // Initialized the hashmap of the weights of the current node outgoing edges
+            weights.put(node.ID, new HashMap<>());
+        }
 
-	/**
-	 * The function that will be executed when clicking on the 'Build Graph' button.
-	 */
-	@CustomButton(buttonText = "Build Graph")
-	public void buildGraph() {
-		try {
-			String input = Tools.showQueryDialog("Number of nodes (n):");
-			if (input == null) return;
-			int numNodes = Integer.parseInt(input);
-			buildGraph(numNodes);
-		} catch (NumberFormatException e) {
-			Tools.showMessageDialog("Please enter a number");
-		}
-	}
+        // Choose 7 random nodes from the available nodes to connect to
+        for (GHSNode currNode : nodes) {
+            // Build a vector containing the nodes which are not connected yet to the current node
+            Vector<GHSNode> availableNodes = new Vector<>(nodes);
+            availableNodes.remove(currNode);
+            for (Edge e : currNode.outgoingConnections) {
+                availableNodes.remove(e.endNode);
+            }
 
-	@CustomButton(buttonText = "Start GHS")
-	public void startGHS() {
-		for (GHSNode node : nodes) {
-			node.startGHS();
-		}
-	}
+            // Choose 7 nodes from the available ones and connect to them with a weighted edge
+            for (int i = 0; i < 7; ++i) {
+                if (availableNodes.isEmpty()) break;
 
-	@CustomButton(buttonText = "Print Fragments")
-	public void printFragments() {
-		Vector<GHSNode> roots = new Vector<>();
-		for (GHSNode node : nodes) {
-			if (node.parent == null) {
-				roots.add(node);
-			}
-		}
+                // Randomly select a node from the available ones and remove it from the available nodes vector
+                GHSNode neighbor = availableNodes.get((int) (dist.nextSample() * availableNodes.size()));
+                availableNodes.remove(neighbor);
 
-		int count = nodes.size();
-		Vector<GHSNode> queue = new Vector<>();
-		for (GHSNode root : roots) {
-			System.out.println("Starting fragment of " + root.ID);
-			queue.add(root);
-			while (!queue.isEmpty()) {
-				GHSNode curr = queue.remove(0);
-				curr.printParent();
-				queue.addAll(curr.children);
-				if (--count == 0) return;
-			}
-		}
-	}
+                // Initialize a random weight to the new edge
+                int weight = WeightedEdge.generateRandomWeight();
+                weights.get(currNode.ID).put(neighbor.ID, weight);
+                weights.get(neighbor.ID).put(currNode.ID, weight);
 
-	@CustomButton(buttonText = "Print Weights")
-	public void printWeights() {
-		for (Map.Entry<Integer, HashMap<Integer, Integer>> nodeEntry : weights.entrySet()) {
-			for (Map.Entry<Integer, Integer> weightEntry : nodeEntry.getValue().entrySet()) {
-				System.out.println("w(" + nodeEntry.getKey() +"," + weightEntry.getKey() + ") = " + weightEntry.getValue());
-			}
-		}
-	}
+                // Add the connection
+                currNode.addConnectionTo(neighbor);
+            }
+        }
 
-	@CustomButton(buttonText = "Show Current State")
-	public void showCurrentState() {
-		Tools.showMessageDialog("" + nodes.get(0).currentState);
-	}
+        // Repaint the GUI as we have added some nodes and edges
+        Tools.repaintGUI();
+    }
 
-	@CustomButton(buttonText = "Has Finished?")
-	public void hasFinished() {
-//		for (GHSNode node : nodes) {
-//			if (!node.hasFinished()) {
-//				return false;
-//			}
-//		}
-//		return true;
+    /**
+     * Ask the user to enter a number of nodes and build a graph with the given number of nodes.
+     */
+    @CustomButton(buttonText = "Build Graph", toolTipText = "Build a graph with a given amount of nodes")
+    public void buildGraph() {
+        try {
+            String input = Tools.showQueryDialog("Number of nodes (n):");
+            if (input == null) return;
+            int numNodes = Integer.parseInt(input);
+            buildGraph(numNodes);
+        } catch (NumberFormatException e) {
+            Tools.showMessageDialog("Please enter a valid number");
+        }
+    }
 
-		int count = 0;
-		for (GHSNode node : nodes) {
-			if (node.parent == null) ++count;
-		}
-		if (count > 1) {
-			Tools.showMessageDialog("Not finished");
-		} else if (count < 1) {
-			Tools.showMessageDialog("Something's wrong, I can feel it");
-		} else {
-			Tools.showMessageDialog("Finished");
-		}
-	}
+    /**
+     * Restart the GHS algorithm in the existing graph.
+     */
+    @CustomButton(buttonText = "Restart GHS Algorithm", toolTipText = "Restart the algorithm on the current graph")
+    public void restartGHS() {
+        for (GHSNode node : nodes) {
+            node.startGHS();
+        }
+    }
 
-	/* (non-Javadoc)
-	 * @see runtime.AbstractCustomGlobal#hasTerminated()
-	 */
-	public boolean hasTerminated() {
-		for (GHSNode node : nodes) {
-			if (!node.hasFinished()) {
-				return false;
-			}
-		}
-		return true;
+    /**
+     * Print the current fragments using BFS.
+     */
+    @CustomButton(buttonText = "Print Fragments")
+    public void printFragments() {
+        // Find all the roots of the fragments
+        Vector<GHSNode> roots = new Vector<>();
+        for (GHSNode node : nodes) {
+            if (node.getParent() == null) {
+                roots.add(node);
+            }
+        }
 
-//		int count = 0;
-//		for (GHSNode node : nodes) {
-//			if (node.parent == null) ++count;
-//		}
-//		if (count > 1) {
-//			return false;
-//		} else if (count < 1) {
-//			// error
-//			return false;
-//		} else {
-//			return true;
-//		}
-	}
+        // For every root, use BFS to scan the fragment and print the nodes
+        int count = nodes.size();
+        Vector<GHSNode> queue = new Vector<>();
+        for (GHSNode root : roots) {
+            System.out.println("Starting fragment of " + root.ID);
+            queue.add(root);
+            while (!queue.isEmpty()) {
+                GHSNode curr = queue.remove(0);
+                curr.printParent();
+                queue.addAll(curr.getChildren());
+                if (--count == 0) return;
+            }
+        }
+    }
+
+    /**
+     * Return whether the algorithm is finished. The simulation check this function and stops once it returns true.
+     *
+     * @return false when there's a node that hasn't finished the algorithm, true otherwise
+     */
+    @Override
+    public boolean hasTerminated() {
+        for (GHSNode node : nodes) {
+            if (!node.hasFinished()) {
+                return false;
+            }
+        }
+        return true;
+    }
 }
