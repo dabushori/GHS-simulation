@@ -700,7 +700,7 @@ public class GHSNode extends Node {
     /* End of Sinalgo hooks */
 
     /* Sinalgo menu buttons */
-    
+
     /**
      * Print the parent of the current node.
      */

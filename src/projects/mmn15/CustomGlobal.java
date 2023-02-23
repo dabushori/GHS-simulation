@@ -39,18 +39,14 @@ package projects.mmn15;
 
 import projects.mmn15.nodes.edges.WeightedEdge;
 import projects.mmn15.nodes.nodeImplementations.GHSNode;
-import projects.sample5.nodes.messages.PayloadMsg;
-import projects.sample5.nodes.nodeImplementations.FNode;
-import projects.sample5.nodes.timers.PayloadMessageTimer;
 import sinalgo.configuration.Configuration;
-import sinalgo.gui.helper.NodeSelectionHandler;
-import sinalgo.nodes.Node;
 import sinalgo.nodes.edges.Edge;
 import sinalgo.runtime.AbstractCustomGlobal;
 import sinalgo.runtime.Runtime;
 import sinalgo.tools.Tools;
 import sinalgo.tools.statistics.UniformDistribution;
 
+import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Vector;
 
@@ -83,6 +79,8 @@ public class CustomGlobal extends AbstractCustomGlobal {
     UniformDistribution dist = new UniformDistribution(0, 1);
     // The hashmap containing the weights of the edges in the graph
     static HashMap<Integer, HashMap<Integer, Integer>> weights = new HashMap<>();
+    // The sum of the weights
+    BigInteger sumOfWeights = BigInteger.ZERO;
 
     /**
      * Get the weight of an edge in the current graph
@@ -119,6 +117,7 @@ public class CustomGlobal extends AbstractCustomGlobal {
         Runtime.clearAllNodes();
         weights.clear();
         nodes.clear();
+        sumOfWeights = BigInteger.ZERO;
 
         // Create the nodes in a random position uniformly selected from [0, dimX] x [0, dimY]
         for (int i = 0; i < numNodes; ++i) {
@@ -158,6 +157,7 @@ public class CustomGlobal extends AbstractCustomGlobal {
 
                 // Initialize a random weight to the new edge
                 int weight = WeightedEdge.generateRandomWeight();
+                sumOfWeights = sumOfWeights.add(BigInteger.valueOf(weight));
                 weights.get(currNode.ID).put(neighbor.ID, weight);
                 weights.get(neighbor.ID).put(currNode.ID, weight);
 
@@ -205,7 +205,7 @@ public class CustomGlobal extends AbstractCustomGlobal {
     /**
      * Print the current fragments using BFS.
      */
-    @CustomButton(buttonText = "Print Fragments")
+    @CustomButton(buttonText = "Print Fragments", toolTipText = "Print a BFS scan of the fragments")
     public void printFragments() {
         // Find all the roots of the fragments
         Vector<GHSNode> roots = new Vector<>();
@@ -257,5 +257,48 @@ public class CustomGlobal extends AbstractCustomGlobal {
             }
         }
         return true;
+    }
+
+    /**
+     * Calculate the sum of the weights in the graph.
+     *
+     * @return The sum of the weights in the graph
+     */
+    public BigInteger calculateSumOfWeights() {
+        return sumOfWeights;
+    }
+
+    /**
+     * Calculate the sum of the weights in the MST.
+     *
+     * @return The sum of the weights in the MST, or null if the MST wasn't found yet
+     */
+    public BigInteger calculateSumOfWeightsInMST() {
+        if (!hasFoundMST()) return null;
+        BigInteger sum = BigInteger.ZERO;
+        for (GHSNode node : nodes) {
+            for (GHSNode child : node.getChildren()) {
+                sum = sum.add(BigInteger.valueOf(getWeight(node.ID, child.ID)));
+            }
+        }
+        return sum;
+    }
+
+    /**
+     * Show the sum of the weights in the graph.
+     */
+    @CustomButton(buttonText = "Show sum of weights", toolTipText = "Show the sum of the weights in the graph")
+    public void showSumOfWeights() {
+        Tools.showMessageDialog("The sum of the weights of all the edges is " + calculateSumOfWeights());
+    }
+
+    /**
+     * Show the sum of the weights in the graph.
+     */
+    @CustomButton(buttonText = "Show sum of weights in the MST", toolTipText = "Show the sum of the weights in the graph")
+    public void showSumOfWeightsInMST() {
+        BigInteger sum = calculateSumOfWeightsInMST();
+        if (sum == null) Tools.showMessageDialog("MST wasn't found yet.");
+        else Tools.showMessageDialog("The sum of the weights of all the edges is " + sum);
     }
 }
