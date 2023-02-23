@@ -30,7 +30,7 @@ The algorithm works by these states:
     In this state, each node convergecasts the MWOE which connects the node to a node from another fragment.
     Each node waits for the MWOE suggestions from all of its children to be received, and then chooses the minimal from those and from its MWOE and forwards it to its parent.
     In addition, each node sends the number of nodes in the subtree which it is the root of. Each node sums the values of its children and adds 1, and this is the value it forwards its parent.
-    The root of every fragment will eventually get the number of nodes in its fragment, and if it is n the algorithm will be finished by broadcasting finish messages.
+    The root of every fragment will eventually get the number of nodes in its fragment, and if it is n the algorithm will be finished by broadcasting server rerouting messages.
 
 5. n iterations of the MWOE_BROADCASTING state.
     In this state, the root broadcasts the chosen MWOE that goes out of the current fragment.
@@ -41,4 +41,12 @@ The algorithm works by these states:
     It will send a FlipEdgeDirectionMessage to its parent, and each node that receives this message will change its parent to be the sender and forward it to its old parent.
     This will continue all the way up to the old root of the fragment.
 
-7. If the algorithm is finished, switch to FINISHED state, otherwise go back to the MWOE_SEND state.
+7. 2n iterations of the SERVER_REROUTING state.
+    In this state, the server node will send its parent a FlipEdgeDirectionMessage, which will be forwarded to the root.
+    Every node in the way will change its parent to be the sender. This is done to make the server be the root of the MST.
+
+8.	The FINISHED state.
+    In this state, the MST is already built. Nodes in this state will listen for messages, and if it is a server request or response messages, they will forward it to the correct node.
+
+9.	The SENDING_MESSAGE_TO_SERVER state.
+    In this state, the node will initially send a server request to its parent, and will wait until a response will be received. Once a response is received, the state will be changed to FINISHED.

@@ -313,44 +313,26 @@ public class CustomGlobal extends AbstractCustomGlobal {
     }
 
     FileWriter resultsFile;
-    int currIdx = 0;
-    int[] numberOfNodes = {200, 291, 382, 473, 564, 655, 746, 837, 928, 1019, 1110, 1201, 1292, 1383, 1474, 1565, 1656, 1747, 1838, 1929, 2000};
 
-    @CustomButton(buttonText = "RUN", toolTipText = "Run")
-    public void runSimulation() {
+    /**
+     * Append the number of nodes, the sum of the weights in the graph and the sum of the weights in the MST to the results file.
+     */
+    @CustomButton(buttonText = "Append results to results file", toolTipText = "Append the results to results file (results.csv)")
+    public void saveResults() {
+        if (!hasFoundMST()) {
+            Tools.showMessageDialog("Didn't find MST yet.");
+            return;
+        }
         try {
-            if (currIdx >= numberOfNodes.length) return;
-            if (nodes.isEmpty()) {
-                resultsFile = new FileWriter(Paths.get(System.getProperty("user.dir"), "results.csv").toString());
+            boolean isResultsFileExist = (new File(Paths.get(System.getProperty("user.dir"), "results.csv").toUri())).exists();
+            resultsFile = new FileWriter(Paths.get(System.getProperty("user.dir"), "results.csv").toString(), true);
+            if (!isResultsFileExist) {
                 resultsFile.write("Number of nodes,Sum of weights,Sum of weights in MST\n");
-            } else {
-                resultsFile.write(String.format("{},{},{}\n", getNumOfNodes(), calculateSumOfWeights(), calculateSumOfWeightsInMST()));
             }
-
-            buildGraph(numberOfNodes[currIdx++]);
-
-            SynchronousRuntimeThread gRT = new SynchronousRuntimeThread(Tools.getGuiRuntime());
-            gRT.numberOfRounds = Long.MAX_VALUE;
-            gRT.refreshRate = Configuration.refreshRate;
-            Global.isRunning = true;
-            gRT.start();
-
+            resultsFile.write(String.format("%d,%d,%d\n", getNumOfNodes(), calculateSumOfWeights(), calculateSumOfWeightsInMST()));
+            resultsFile.close();
         } catch (IOException e) {
-            System.out.println("Failed writing results.");
+            Tools.showMessageDialog("Failed writing results.");
         }
     }
-
-    @Override
-    public void onExit() {
-        super.onExit();
-        try {
-            if (resultsFile != null) {
-                resultsFile.write(String.format("{},{},{}\n", getNumOfNodes(), calculateSumOfWeights(), calculateSumOfWeightsInMST()));
-                resultsFile.close();
-            }
-        } catch (IOException e) {
-            System.out.println("Error closing the results file.");
-        }
-    }
-
 }
