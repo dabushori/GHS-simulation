@@ -299,7 +299,7 @@ public class CustomGlobal extends AbstractCustomGlobal {
      */
     @CustomButton(buttonText = "Show sum of weights", toolTipText = "Show the sum of the weights in the graph")
     public void showSumOfWeights() {
-        Tools.showMessageDialog("The sum of the weights of all the edges is " + calculateSumOfWeights());
+        Tools.showMessageDialog("The sum of the weights of all the edges in the graph is " + calculateSumOfWeights());
     }
 
     /**
@@ -309,7 +309,7 @@ public class CustomGlobal extends AbstractCustomGlobal {
     public void showSumOfWeightsInMST() {
         BigInteger sum = calculateSumOfWeightsInMST();
         if (sum == null) Tools.showMessageDialog("MST wasn't found yet.");
-        else Tools.showMessageDialog("The sum of the weights of all the edges is " + sum);
+        else Tools.showMessageDialog("The sum of the weights of all the edges in the MST is " + sum);
     }
 
     FileWriter resultsFile;
